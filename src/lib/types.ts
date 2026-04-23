@@ -5,11 +5,34 @@ export interface Meta {
 	generated_date: string;
 	total_sources: number;
 	total_candidates: number;
+	migration_status_counts: Record<string, number>;
 	components: string[];
 	verdicts: string[];
 	maintainers: string[];
 	arches: string[];
 	statuses: string[];
+}
+
+// GET /blocked (paginated list)
+export interface BlockedResponse {
+	generated_date: string;
+	total: number;
+	offset: number;
+	limit: number;
+	sort: string;
+	order: string;
+	sources: BlockedSource[];
+}
+
+export interface BlockedSource {
+	source_package: string;
+	verdict: string;
+	old_version: string;
+	new_version: string;
+	age: number;
+	excuse_detail?: string;
+	dependencies?: Dependencies;
+	hints?: Hint[];
 }
 
 // GET /sources (paginated list)

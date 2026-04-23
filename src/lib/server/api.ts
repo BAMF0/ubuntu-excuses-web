@@ -5,7 +5,13 @@
  * with the EXCUSES_API_URL environment variable.
  */
 import { env } from '$env/dynamic/private';
-import type { Meta, SourcesResponse, Source, AutopkgtestResponse } from '$lib/types.js';
+import type {
+	Meta,
+	SourcesResponse,
+	Source,
+	AutopkgtestResponse,
+	BlockedResponse
+} from '$lib/types.js';
 
 function getBaseUrl(): string {
 	return env.EXCUSES_API_URL ?? 'http://localhost:8080';
@@ -62,4 +68,21 @@ export function getSource(name: string): Promise<Source> {
 
 export function getAutopkgtest(name: string): Promise<AutopkgtestResponse> {
 	return apiFetch<AutopkgtestResponse>(`/sources/${encodeURIComponent(name)}/autopkgtest`);
+}
+
+export interface BlockedParams {
+	offset?: number;
+	limit?: number;
+	sort?: string;
+	order?: string;
+}
+
+export function getBlocked(params?: BlockedParams): Promise<BlockedResponse> {
+	const query: Record<string, string> = {};
+	if (params) {
+		for (const [k, v] of Object.entries(params)) {
+			if (v !== undefined && v !== null) query[k] = String(v);
+		}
+	}
+	return apiFetch<BlockedResponse>('/blocked', query);
 }
