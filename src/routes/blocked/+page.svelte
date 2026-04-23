@@ -31,6 +31,18 @@
 		if (blocked.sort !== field) return '';
 		return blocked.order === 'asc' ? ' ▲' : ' ▼';
 	}
+
+	function formatAge(days: number): { value: string; unit: string } {
+		if (days < 1 / 24 / 60) {
+			return { value: Math.round(days * 24 * 60 * 60).toString(), unit: 'seconds' };
+		} else if (days < 1 / 24) {
+			return { value: Math.round(days * 24 * 60).toString(), unit: 'minutes' };
+		} else if (days < 1) {
+			return { value: (Math.round(days * 24 * 10) / 10).toString(), unit: 'hours' };
+		} else {
+			return { value: (Math.round(days * 10) / 10).toString(), unit: 'days' };
+		}
+	}
 </script>
 
 <svelte:head>
@@ -94,17 +106,22 @@
 									}}
 								>
 									<span class="p-accordion__title">
-										<strong>{src.source_package}</strong>
-										<span class="u-text--muted" style="margin-left: 0.75rem;">
-											{src.old_version} → {src.new_version}
+										<span class="accordion-header">
+											<span class="accordion-title-left">
+												<strong>{src.source_package}</strong>
+												<span class="u-text--muted" style="margin-left: 0.75rem;">
+													{src.old_version} → {src.new_version}
+												</span>
+											</span>
+											{#if src.excuse_detail}
+												<span class="p-accordion__excuse">{src.excuse_detail}</span>
+											{/if}
 										</span>
-										{#if src.excuse_detail}
-											<span class="p-accordion__excuse">{src.excuse_detail}</span>
-										{/if}
 									</span>
 								</div>
 
 								{#if isOpen}
+									{@const a = formatAge(src.age)}
 									<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 									<section
 										role="tabpanel"
@@ -119,8 +136,8 @@
 													<td><VerdictBadge verdict={src.verdict} /></td>
 												</tr>
 												<tr>
-													<th>Age (days)</th>
-													<td>{src.age}</td>
+													<th>Age</th>
+													<td>{a.value} {a.unit}</td>
 												</tr>
 												{#if src.excuse_detail}
 													<tr>
@@ -234,10 +251,40 @@
 		font-weight: 600;
 	}
 
+	/* Vanilla assumes p-accordion__tab is a <button> (display: inline-flex).
+	   Since we use a <div> for accessibility reasons, we must set flex explicitly. */
+	.p-accordion__tab {
+		display: flex;
+		align-items: center;
+	}
+
+	.p-accordion__title {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.accordion-header {
+		display: flex;
+		align-items: center;
+		width: 100%;
+		min-width: 0;
+	}
+
+	.accordion-title-left {
+		flex-shrink: 0;
+	}
+
 	.p-accordion__excuse {
 		font-size: 0.875rem;
 		color: #666;
 		font-weight: 400;
-		margin-left: 0.75rem;
+		margin-left: auto;
+		padding-left: 1rem;
+		text-align: right;
+		flex-shrink: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>
