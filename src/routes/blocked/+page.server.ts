@@ -6,7 +6,8 @@ export const load: PageServerLoad = async ({ url }) => {
 	const limit = Number(url.searchParams.get('limit') ?? '50');
 	const sort = url.searchParams.get('sort') ?? 'age';
 	const order = url.searchParams.get('order') ?? 'asc';
+	const team = url.searchParams.get('team') ?? '';
 
-	const blocked = await getBlocked({ offset, limit, sort, order });
-	return { blocked };
+	const blocked = await getBlocked({ offset, limit, sort, order, team: team || undefined });
+	return { blocked, team };
 };

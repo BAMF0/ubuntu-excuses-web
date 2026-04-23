@@ -10,6 +10,7 @@ export interface Meta {
 	verdicts: string[];
 	maintainers: string[];
 	arches: string[];
+	teams: string[];
 	statuses: string[];
 }
 

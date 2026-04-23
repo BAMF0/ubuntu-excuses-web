@@ -4,6 +4,23 @@
 
 	let { data } = $props();
 	const blocked = $derived(data.blocked);
+	const teams = $derived(data.meta?.teams ?? []);
+
+	/* ── Team filter (server-side via URL) ─────────────────────── */
+	let teamInput = $state('');
+
+	$effect(() => {
+		teamInput = data.team ?? '';
+	});
+
+	function applyTeamFilter() {
+		goto(buildUrl({ team: teamInput.trim(), offset: '0' }));
+	}
+
+	function clearTeamFilter() {
+		teamInput = '';
+		goto(buildUrl({ team: '', offset: '0' }));
+	}
 
 	let searchQuery = $state('');
 
@@ -46,14 +63,16 @@
 
 	/* ── Helpers ────────────────────────────────────────────────── */
 	function buildUrl(overrides: Record<string, string>) {
-		const params: Record<string, string> = {
+		const base: Record<string, string> = {
 			sort: blocked.sort,
 			order: blocked.order,
 			limit: String(blocked.limit),
 			offset: '0',
-			...overrides
 		};
-		return `/blocked?${new URLSearchParams(params)}`;
+		if (data.team) base.team = data.team;
+		const merged = { ...base, ...overrides };
+		const filtered = Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== ''));
+		return `/blocked?${new URLSearchParams(filtered)}`;
 	}
 
 	function numFailures(src: (typeof blocked.sources)[number]): number {
@@ -88,6 +107,27 @@
 						placeholder="Filter by package name on this page…"
 						bind:value={searchQuery}
 					/>
+				</div>
+
+				<div class="toolbar__team">
+					<label class="u-off-screen" for="team-input">Filter by team</label>
+					<input
+						list="team-list"
+						id="team-input"
+						class="p-form__control toolbar__team-input"
+						placeholder="Filter by team…"
+						bind:value={teamInput}
+						onchange={applyTeamFilter}
+						onkeydown={(e) => e.key === 'Enter' && applyTeamFilter()}
+					/>
+					<datalist id="team-list">
+						{#each teams as t}
+							<option value={t}></option>
+						{/each}
+					</datalist>
+					{#if data.team}
+						<button class="p-button--base toolbar__team-clear" onclick={clearTeamFilter} title="Clear team filter">✕</button>
+					{/if}
 				</div>
 
 				<div class="toolbar__sort">
@@ -196,45 +236,54 @@
 													<span class="excuse-note">{src.excuse_detail}</span>
 												{/if}
 
-												{#if src.dependencies?.blocked_by?.length}
-													<span class="detail-group">
-														<strong>Blocked by:</strong>
-														{#each src.dependencies.blocked_by as dep, j}
-															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.blocked_by.length - 1 ? ', ' : ''}
-														{/each}
-													</span>
-												{/if}
-												{#if src.dependencies?.blocks?.length}
-													<span class="detail-group">
-														<strong>Blocks:</strong>
-														{#each src.dependencies.blocks as dep, j}
-															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.blocks.length - 1 ? ', ' : ''}
-														{/each}
-													</span>
-												{/if}
-												{#if src.dependencies?.migrate_after?.length}
-													<span class="detail-group">
-														<strong>Migrate after:</strong>
-														{#each src.dependencies.migrate_after as dep, j}
-															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.migrate_after.length - 1 ? ', ' : ''}
-														{/each}
-													</span>
-												{/if}
-												{#if src.hints?.length}
-													<span class="detail-group">
-														<strong>Hints:</strong>
-														{src.hints.map((h) => `${h.type} (${h.from})`).join(', ')}
-													</span>
-												{/if}
+												<div class="detail-meta">
+													{#if src.team}
+														<span class="detail-group">
+															<strong>Team:</strong> {src.team}
+														</span>
+													{/if}
+													{#if src.dependencies?.blocked_by?.length}
+														<span class="detail-group">
+															<strong>Blocked by:</strong>
+															{#each src.dependencies.blocked_by as dep, j}
+																<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.blocked_by.length - 1 ? ', ' : ''}
+															{/each}
+														</span>
+													{/if}
+													{#if src.dependencies?.blocks?.length}
+														<span class="detail-group">
+															<strong>Blocks:</strong>
+															{#each src.dependencies.blocks as dep, j}
+																<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.blocks.length - 1 ? ', ' : ''}
+															{/each}
+														</span>
+													{/if}
+													{#if src.dependencies?.migrate_after?.length}
+														<span class="detail-group">
+															<strong>Migrate after:</strong>
+															{#each src.dependencies.migrate_after as dep, j}
+																<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.migrate_after.length - 1 ? ', ' : ''}
+															{/each}
+														</span>
+													{/if}
+													{#if src.hints?.length}
+														<span class="detail-group">
+															<strong>Hints:</strong>
+															{src.hints.map((h) => `${h.type} (${h.from})`).join(', ')}
+														</span>
+													{/if}
+												</div>
 
-												<a class="detail-link" href="/sources/{encodeURIComponent(src.source_package)}?from=blocked">
-													View full details →
-												</a>
-												{#if src.has_autopkgtest}
-													<a class="detail-link" href="/sources/{encodeURIComponent(src.source_package)}/autopkgtest">
-														Autopkgtests →
+												<div class="detail-links">
+													<a href="/sources/{encodeURIComponent(src.source_package)}?from=blocked">
+														View full details →
 													</a>
-												{/if}
+													{#if src.has_autopkgtest}
+														<a href="/sources/{encodeURIComponent(src.source_package)}/autopkgtest">
+															Autopkgtests →
+														</a>
+													{/if}
+												</div>
 											</div>
 										</td>
 									</tr>
@@ -300,12 +349,31 @@
 
 	.toolbar__search {
 		flex: 1;
-		min-width: 12rem;
+		min-width: 10rem;
 	}
 
 	.toolbar__search-input {
 		width: 100%;
 		margin-bottom: 0;
+	}
+
+	.toolbar__team {
+		flex: 1;
+		min-width: 10rem;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.toolbar__team-input {
+		flex: 1;
+		margin-bottom: 0;
+	}
+
+	.toolbar__team-clear {
+		margin-bottom: 0;
+		padding: 0 0.5rem;
+		flex-shrink: 0;
 	}
 
 	.toolbar__sort {
@@ -396,20 +464,26 @@
 
 	.detail-inner {
 		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.25rem 1.25rem;
+		flex-direction: column;
+		gap: 0.25rem;
 		font-size: 0.875rem;
+	}
+
+	.detail-meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1.25rem;
+		align-items: baseline;
 	}
 
 	.detail-group {
 		white-space: normal;
 	}
 
-	.detail-link {
-		margin-left: auto;
-		white-space: nowrap;
-		flex-shrink: 0;
+	.detail-links {
+		display: flex;
+		gap: 1rem;
+		margin-top: 0.25rem;
 	}
 
 	/* ── Excuse callout ────────────────────────────────────────── */

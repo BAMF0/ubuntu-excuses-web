@@ -77,6 +77,7 @@ export interface BlockedParams {
 	limit?: number;
 	sort?: string;
 	order?: string;
+	team?: string;
 }
 
 export function getBlocked(params?: BlockedParams): Promise<BlockedResponse> {
