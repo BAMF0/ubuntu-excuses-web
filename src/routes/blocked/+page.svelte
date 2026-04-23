@@ -142,6 +142,16 @@
 													{/each}
 												</ul>
 											{/if}
+											{#if src.dependencies.blocks && src.dependencies.blocks.length > 0}
+												<p><strong>Blocks:</strong></p>
+												<ul class="p-list--divided">
+													{#each src.dependencies.blocks as dep}
+														<li class="p-list__item">
+															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>
+														</li>
+													{/each}
+												</ul>
+											{/if}
 											{#if src.dependencies.migrate_after && src.dependencies.migrate_after.length > 0}
 												<p><strong>Migrate after:</strong></p>
 												<ul class="p-list--divided">

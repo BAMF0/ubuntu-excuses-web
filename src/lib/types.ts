@@ -109,6 +109,7 @@ export interface UpdateExcusePolicy {
 
 export interface Dependencies {
 	blocked_by?: string[];
+	blocks?: string[];
 	migrate_after?: string[];
 }
 

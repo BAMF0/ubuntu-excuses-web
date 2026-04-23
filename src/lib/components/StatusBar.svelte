@@ -17,6 +17,18 @@
 	const statusEntries = $derived(
 		Object.entries(meta.migration_status_counts ?? {}).sort(([a], [b]) => a.localeCompare(b))
 	);
+
+	const statusLabels: Record<string, string> = {
+		BLOCKED: 'Blocked',
+		WILL_ATTEMPT: 'Will attempt',
+		PASS: 'Pass',
+		REJECTED: 'Rejected',
+		WAITING: 'Waiting'
+	};
+
+	function formatStatus(status: string): string {
+		return statusLabels[status] ?? status.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
 </script>
 
 <div class="p-status-bar">
@@ -40,7 +52,7 @@
 			</span>
 			{#each statusEntries as [status, count]}
 				<span class="p-status-bar__item">
-					<strong>{status}:</strong>
+					<span class="p-status-bar__status-label p-status-bar__status--{status.toLowerCase()}">{formatStatus(status)}:</span>
 					{count.toLocaleString()}
 				</span>
 			{/each}
@@ -67,6 +79,31 @@
 		color: #999;
 		font-weight: 400;
 		margin-right: 0.25rem;
+	}
+
+	.p-status-bar__status-label {
+		font-weight: 400;
+		margin-right: 0.25rem;
+	}
+
+	.p-status-bar__status--blocked {
+		color: #c7162b;
+	}
+
+	.p-status-bar__status--will_attempt {
+		color: #0e8420;
+	}
+
+	.p-status-bar__status--pass {
+		color: #0e8420;
+	}
+
+	.p-status-bar__status--rejected {
+		color: #c7162b;
+	}
+
+	.p-status-bar__status--waiting {
+		color: #f99b11;
 	}
 
 	.p-status-bar__home {
