@@ -26,10 +26,12 @@ export interface BlockedResponse {
 
 export interface BlockedSource {
 	source_package: string;
+	team?: string;
 	verdict: string;
 	old_version: string;
 	new_version: string;
 	age: number;
+	has_autopkgtest: boolean;
 	excuse_detail?: string;
 	dependencies?: Dependencies;
 	hints?: Hint[];

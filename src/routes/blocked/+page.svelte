@@ -230,6 +230,11 @@
 												<a class="detail-link" href="/sources/{encodeURIComponent(src.source_package)}?from=blocked">
 													View full details →
 												</a>
+												{#if src.has_autopkgtest}
+													<a class="detail-link" href="/sources/{encodeURIComponent(src.source_package)}/autopkgtest">
+														Autopkgtests →
+													</a>
+												{/if}
 											</div>
 										</td>
 									</tr>
