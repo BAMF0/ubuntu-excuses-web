@@ -6,7 +6,7 @@
 	function navigate() {
 		const trimmed = query.trim();
 		if (trimmed) {
-			goto(`/sources/${encodeURIComponent(trimmed)}`);
+			goto(`/search?q=${encodeURIComponent(trimmed)}`);
 		}
 	}
 

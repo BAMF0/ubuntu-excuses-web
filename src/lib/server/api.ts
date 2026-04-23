@@ -50,6 +50,8 @@ export interface SourcesParams {
 	verdict?: string;
 	maintainer?: string;
 	status?: string;
+	search?: string;
+	depends?: string;
 }
 
 export function getSources(params?: SourcesParams): Promise<SourcesResponse> {

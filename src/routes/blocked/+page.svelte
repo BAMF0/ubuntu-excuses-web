@@ -6,6 +6,15 @@
 	const blocked = $derived(data.blocked);
 
 	let openIndex = $state<number | null>(null);
+	let searchQuery = $state('');
+
+	const displayedSources = $derived(
+		searchQuery.trim()
+			? blocked.sources.filter((s) =>
+					s.source_package.toLowerCase().includes(searchQuery.trim().toLowerCase())
+				)
+			: blocked.sources
+	);
 
 	function toggle(i: number) {
 		openIndex = openIndex === i ? null : i;
@@ -22,16 +31,6 @@
 		return `/blocked?${new URLSearchParams(params)}`;
 	}
 
-	function handleSort(field: string) {
-		const newOrder = blocked.sort === field && blocked.order === 'asc' ? 'desc' : 'asc';
-		goto(buildUrl({ sort: field, order: newOrder }));
-	}
-
-	function sortIndicator(field: string): string {
-		if (blocked.sort !== field) return '';
-		return blocked.order === 'asc' ? ' ▲' : ' ▼';
-	}
-
 	function formatAge(days: number): { value: string; unit: string } {
 		if (days < 1 / 24 / 60) {
 			return { value: Math.round(days * 24 * 60 * 60).toString(), unit: 'seconds' };
@@ -42,6 +41,14 @@
 		} else {
 			return { value: (Math.round(days * 10) / 10).toString(), unit: 'days' };
 		}
+	}
+
+	function verdictColor(verdict: string): string {
+		const v = verdict.toUpperCase();
+		if (v === 'PASS' || v === 'WILL_ATTEMPT') return '#0e8420';
+		if (v.startsWith('REJECTED') || v === 'BLOCKED') return '#c7162b';
+		if (v === 'WAITING' || v.includes('TEMPORARY')) return '#f99b11';
+		return '#757575';
 	}
 </script>
 
@@ -57,22 +64,39 @@
 				{blocked.total.toLocaleString()} packages blocked from migration.
 			</p>
 
-			<div class="p-sort-controls">
-				<span class="u-text--muted">Sort by:</span>
-				<button
-					class="p-button--base"
-					class:is-active={blocked.sort === 'age'}
-					onclick={() => handleSort('age')}
-				>
-					Age{sortIndicator('age')}
-				</button>
-				<button
-					class="p-button--base"
-					class:is-active={blocked.sort === 'name'}
-					onclick={() => handleSort('name')}
-				>
-					Name{sortIndicator('name')}
-				</button>
+			<div class="toolbar">
+				<div class="toolbar__search">
+					<label class="u-off-screen" for="pkg-search">Filter packages</label>
+					<input
+						type="search"
+						id="pkg-search"
+						class="p-form__control toolbar__search-input"
+						placeholder="Filter by package name on this page…"
+						bind:value={searchQuery}
+					/>
+				</div>
+
+				<div class="toolbar__sort">
+					<label class="toolbar__sort-label" for="sort-select">Sort by</label>
+					<select
+						id="sort-select"
+						class="p-form__control toolbar__sort-select"
+						value={blocked.sort}
+						onchange={(e) => goto(buildUrl({ sort: e.currentTarget.value }))}
+					>
+						<option value="age">Age</option>
+						<option value="name">Name</option>
+					</select>
+					<button
+						class="p-button--base toolbar__direction-btn"
+						onclick={() => goto(buildUrl({ order: blocked.order === 'asc' ? 'desc' : 'asc' }))}
+						title={blocked.order === 'asc'
+							? 'Currently ascending – click to sort descending'
+							: 'Currently descending – click to sort ascending'}
+					>
+						{blocked.order === 'asc' ? '↑ Ascending' : '↓ Descending'}
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -81,15 +105,22 @@
 <section class="p-strip u-no-padding--top">
 	<div class="row">
 		<div class="col-12">
-			{#if blocked.sources.length === 0}
-				<p>No blocked packages found.</p>
+			{#if displayedSources.length === 0}
+				<p>
+					{searchQuery.trim()
+						? `No packages match "${searchQuery}" on this page.`
+						: 'No blocked packages found.'}
+				</p>
 			{:else}
-			<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
-				<aside class="p-accordion" role="tablist" aria-multiselectable="true">
+				<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+				<aside class="p-accordion blocked-accordion" role="tablist" aria-multiselectable="true">
 					<ul class="p-accordion__list">
-						{#each blocked.sources as src, i}
+						{#each displayedSources as src, i}
 							{@const isOpen = openIndex === i}
-							<li class="p-accordion__group">
+							<li
+								class="p-accordion__group"
+								style="border-left: 3px solid {verdictColor(src.verdict)}"
+							>
 								<div
 									role="tab"
 									class="p-accordion__tab"
@@ -107,15 +138,17 @@
 								>
 									<span class="p-accordion__title">
 										<span class="accordion-header">
-											<span class="accordion-title-left">
+											<span class="accordion-col-left">
 												<strong>{src.source_package}</strong>
-												<span class="u-text--muted" style="margin-left: 0.75rem;">
+												<span class="u-text--muted version-range">
 													{src.old_version} → {src.new_version}
 												</span>
 											</span>
-											{#if src.excuse_detail}
-												<span class="p-accordion__excuse">{src.excuse_detail}</span>
-											{/if}
+											<span class="accordion-col-right">
+												{#if src.excuse_detail}
+													<span class="accordion-excuse">{src.excuse_detail}</span>
+												{/if}
+											</span>
 										</span>
 									</span>
 								</div>
@@ -129,7 +162,14 @@
 										id="panel-blocked-{i}"
 										aria-labelledby="tab-blocked-{i}"
 									>
-										<table class="p-table--mobile-card" aria-label="Details for {src.source_package}">
+										{#if src.excuse_detail}
+											<p class="excuse-note">{src.excuse_detail}</p>
+										{/if}
+
+										<table
+											class="p-table--mobile-card"
+											aria-label="Details for {src.source_package}"
+										>
 											<tbody>
 												<tr>
 													<th>Verdict</th>
@@ -139,12 +179,6 @@
 													<th>Age</th>
 													<td>{a.value} {a.unit}</td>
 												</tr>
-												{#if src.excuse_detail}
-													<tr>
-														<th>Excuse</th>
-														<td>{src.excuse_detail}</td>
-													</tr>
-												{/if}
 											</tbody>
 										</table>
 
@@ -191,7 +225,7 @@
 										{/if}
 
 										<p>
-											<a href="/sources/{encodeURIComponent(src.source_package)}">
+											<a href="/sources/{encodeURIComponent(src.source_package)}?from=blocked">
 												View full details →
 											</a>
 										</p>
@@ -210,7 +244,9 @@
 								<li class="p-pagination__item">
 									<a
 										class="p-pagination__link--previous"
-										href="/blocked?offset={Math.max(0, blocked.offset - blocked.limit)}&limit={blocked.limit}&sort={blocked.sort}&order={blocked.order}"
+										href={buildUrl({
+											offset: String(Math.max(0, blocked.offset - blocked.limit))
+										})}
 									>
 										<span class="p-pagination__label">Previous</span>
 									</a>
@@ -218,14 +254,19 @@
 							{/if}
 							<li class="p-pagination__item">
 								<span class="u-text--muted">
-									{blocked.offset + 1}–{Math.min(blocked.offset + blocked.limit, blocked.total)} of {blocked.total.toLocaleString()}
+									{blocked.offset + 1}–{Math.min(
+										blocked.offset + blocked.limit,
+										blocked.total
+									)} of {blocked.total.toLocaleString()}
 								</span>
 							</li>
 							{#if blocked.offset + blocked.limit < blocked.total}
 								<li class="p-pagination__item">
 									<a
 										class="p-pagination__link--next"
-										href="/blocked?offset={blocked.offset + blocked.limit}&limit={blocked.limit}&sort={blocked.sort}&order={blocked.order}"
+										href={buildUrl({
+											offset: String(blocked.offset + blocked.limit)
+										})}
 									>
 										<span class="p-pagination__label">Next</span>
 									</a>
@@ -240,16 +281,48 @@
 </section>
 
 <style lang="scss">
-	.p-sort-controls {
+	/* ── Toolbar ───────────────────────────────────────────────── */
+	.toolbar {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 1rem;
 		margin-bottom: 1rem;
 	}
 
-	.p-sort-controls .is-active {
-		font-weight: 600;
+	.toolbar__search {
+		flex: 1;
+		min-width: 12rem;
 	}
+
+	.toolbar__search-input {
+		width: 100%;
+		margin-bottom: 0;
+	}
+
+	.toolbar__sort {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
+	}
+
+	.toolbar__sort-label {
+		color: #666;
+		white-space: nowrap;
+	}
+
+	.toolbar__sort-select {
+		margin-bottom: 0;
+		width: auto;
+	}
+
+	.toolbar__direction-btn {
+		margin-bottom: 0;
+		white-space: nowrap;
+	}
+
+	/* ── Accordion overrides ───────────────────────────────────── */
 
 	/* Vanilla assumes p-accordion__tab is a <button> (display: inline-flex).
 	   Since we use a <div> for accessibility reasons, we must set flex explicitly. */
@@ -264,27 +337,50 @@
 	}
 
 	.accordion-header {
-		display: flex;
+		display: grid;
+		grid-template-columns: 3fr 2fr;
 		align-items: center;
 		width: 100%;
+		gap: 1rem;
+	}
+
+	.accordion-col-left {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
 		min-width: 0;
+		overflow: hidden;
 	}
 
-	.accordion-title-left {
-		flex-shrink: 0;
+	.version-range {
+		font-size: 0.875rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.p-accordion__excuse {
+	.accordion-col-right {
+		min-width: 0;
+		text-align: right;
+	}
+
+	.accordion-excuse {
 		font-size: 0.875rem;
 		color: #666;
-		font-weight: 400;
-		margin-left: auto;
-		padding-left: 1rem;
-		text-align: right;
-		flex-shrink: 1;
-		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		display: block;
+	}
+
+	/* ── Expanded panel ────────────────────────────────────────── */
+	.excuse-note {
+		background: #f5f5f5;
+		border-left: 4px solid #d9d9d9;
+		border-radius: 0 2px 2px 0;
+		color: #3c3c3c;
+		font-size: 0.875rem;
+		margin-bottom: 1rem;
+		padding: 0.5rem 0.75rem;
 	}
 </style>

@@ -3,7 +3,21 @@
 	import PolicyTable from '$lib/components/PolicyTable.svelte';
 
 	let { data } = $props();
-	const pkg = data.source;
+	const pkg = $derived(data.source);
+	const backHref = $derived(
+		data.from === 'blocked'
+			? '/blocked'
+			: data.from === 'search' && data.backUrl
+				? data.backUrl
+				: '/'
+	);
+	const backLabel = $derived(
+		data.from === 'blocked'
+			? '← Back to blocked'
+			: data.from === 'search'
+				? '← Back to search results'
+				: '← Back to home'
+	);
 </script>
 
 <svelte:head>
@@ -14,7 +28,7 @@
 	<div class="row">
 		<div class="col-12">
 			<p>
-				<a href="/">← Back to search</a>
+				<a href={backHref}>{backLabel}</a>
 			</p>
 			<h1 class="p-heading--2">{pkg.source_package}</h1>
 		</div>
