@@ -5,9 +5,37 @@
 	let { data } = $props();
 	const blocked = $derived(data.blocked);
 
-	let openIndex = $state<number | null>(null);
 	let searchQuery = $state('');
 
+	/* ── Expand / collapse state ───────────────────────────────── */
+	let allExpanded = $state(false);
+	/* Rows individually toggled away from the global state. */
+	let overrides = $state(new Set<number>());
+
+	/* Read saved preference once after mount (localStorage is browser-only). */
+	$effect(() => {
+		const saved = localStorage.getItem('blockedExpandAll');
+		if (saved !== null) allExpanded = saved === 'true';
+	});
+
+	function isOpen(i: number): boolean {
+		return allExpanded ? !overrides.has(i) : overrides.has(i);
+	}
+
+	function toggle(i: number) {
+		const next = new Set(overrides);
+		if (next.has(i)) next.delete(i);
+		else next.add(i);
+		overrides = next;
+	}
+
+	function setAllExpanded(val: boolean) {
+		allExpanded = val;
+		overrides = new Set();
+		localStorage.setItem('blockedExpandAll', String(val));
+	}
+
+	/* ── Derived / filtered list ───────────────────────────────── */
 	const displayedSources = $derived(
 		searchQuery.trim()
 			? blocked.sources.filter((s) =>
@@ -16,10 +44,7 @@
 			: blocked.sources
 	);
 
-	function toggle(i: number) {
-		openIndex = openIndex === i ? null : i;
-	}
-
+	/* ── Helpers ────────────────────────────────────────────────── */
 	function buildUrl(overrides: Record<string, string>) {
 		const params: Record<string, string> = {
 			sort: blocked.sort,
@@ -31,24 +56,13 @@
 		return `/blocked?${new URLSearchParams(params)}`;
 	}
 
-	function formatAge(days: number): { value: string; unit: string } {
-		if (days < 1 / 24 / 60) {
-			return { value: Math.round(days * 24 * 60 * 60).toString(), unit: 'seconds' };
-		} else if (days < 1 / 24) {
-			return { value: Math.round(days * 24 * 60).toString(), unit: 'minutes' };
-		} else if (days < 1) {
-			return { value: (Math.round(days * 24 * 10) / 10).toString(), unit: 'hours' };
-		} else {
-			return { value: (Math.round(days * 10) / 10).toString(), unit: 'days' };
-		}
+	function numFailures(src: (typeof blocked.sources)[number]): number {
+		return src.dependencies?.blocked_by?.length ?? 0;
 	}
 
-	function verdictColor(verdict: string): string {
-		const v = verdict.toUpperCase();
-		if (v === 'PASS' || v === 'WILL_ATTEMPT') return '#0e8420';
-		if (v.startsWith('REJECTED') || v === 'BLOCKED') return '#c7162b';
-		if (v === 'WAITING' || v.includes('TEMPORARY')) return '#f99b11';
-		return '#757575';
+	function ageDays(age: number): string {
+		if (age < 1) return '<1';
+		return Math.round(age).toString();
 	}
 </script>
 
@@ -97,6 +111,18 @@
 						{blocked.order === 'asc' ? '↑ Ascending' : '↓ Descending'}
 					</button>
 				</div>
+
+				<div class="toolbar__expand">
+					{#if allExpanded}
+						<button class="p-button--base" onclick={() => setAllExpanded(false)}>
+							Collapse all
+						</button>
+					{:else}
+						<button class="p-button--base" onclick={() => setAllExpanded(true)}>
+							Expand all
+						</button>
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>
@@ -112,22 +138,24 @@
 						: 'No blocked packages found.'}
 				</p>
 			{:else}
-				<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
-				<aside class="p-accordion blocked-accordion" role="tablist" aria-multiselectable="true">
-					<ul class="p-accordion__list">
-						{#each displayedSources as src, i}
-							{@const isOpen = openIndex === i}
-							<li
-								class="p-accordion__group"
-								style="border-left: 3px solid {verdictColor(src.verdict)}"
-							>
-								<div
-									role="tab"
-									class="p-accordion__tab"
-									id="tab-blocked-{i}"
-									aria-controls="panel-blocked-{i}"
-									aria-expanded={isOpen}
-									tabindex="0"
+				<div class="table-scroll-wrapper">
+					<table class="p-table blocked-table">
+						<thead>
+							<tr>
+								<th class="col-expand"></th>
+								<th>Source Package</th>
+								<th>Versions</th>
+								<th class="col-num u-align--right">Failures</th>
+								<th class="col-num u-align--right">Age (days)</th>
+								<th>Verdict</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each displayedSources as src, i}
+								{@const open = isOpen(i)}
+								<tr
+									class="summary-row"
+									class:is-open={open}
 									onclick={() => toggle(i)}
 									onkeydown={(e) => {
 										if (e.key === 'Enter' || e.key === ' ') {
@@ -135,106 +163,81 @@
 											toggle(i);
 										}
 									}}
+									role="button"
+									tabindex="0"
+									aria-expanded={open}
+									aria-label="Toggle details for {src.source_package}"
 								>
-									<span class="p-accordion__title">
-										<span class="accordion-header">
-											<span class="accordion-col-left">
-												<strong>{src.source_package}</strong>
-												<span class="u-text--muted version-range">
-													{src.old_version} → {src.new_version}
-												</span>
-											</span>
-											<span class="accordion-col-right">
+									<td class="col-expand">
+										<span class="expand-chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
+									</td>
+									<td class="col-pkg">
+										<strong>{src.source_package}</strong>
+									</td>
+									<td class="col-versions u-text--muted">
+										{src.old_version} → {src.new_version}
+									</td>
+									<td class="col-num u-align--right">
+										{numFailures(src)}
+									</td>
+									<td class="col-num u-align--right">
+										{ageDays(src.age)}
+									</td>
+									<td class="col-verdict">
+										<VerdictBadge verdict={src.verdict} />
+									</td>
+								</tr>
+
+								{#if open}
+									<tr class="detail-row">
+										<td colspan="6" class="detail-cell">
+											<div class="detail-inner">
 												{#if src.excuse_detail}
-													<span class="accordion-excuse">{src.excuse_detail}</span>
+													<span class="excuse-note">{src.excuse_detail}</span>
 												{/if}
-											</span>
-										</span>
-									</span>
-								</div>
 
-								{#if isOpen}
-									{@const a = formatAge(src.age)}
-									<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
-									<section
-										role="tabpanel"
-										class="p-accordion__panel"
-										id="panel-blocked-{i}"
-										aria-labelledby="tab-blocked-{i}"
-									>
-										{#if src.excuse_detail}
-											<p class="excuse-note">{src.excuse_detail}</p>
-										{/if}
+												{#if src.dependencies?.blocked_by?.length}
+													<span class="detail-group">
+														<strong>Blocked by:</strong>
+														{#each src.dependencies.blocked_by as dep, j}
+															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.blocked_by.length - 1 ? ', ' : ''}
+														{/each}
+													</span>
+												{/if}
+												{#if src.dependencies?.blocks?.length}
+													<span class="detail-group">
+														<strong>Blocks:</strong>
+														{#each src.dependencies.blocks as dep, j}
+															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.blocks.length - 1 ? ', ' : ''}
+														{/each}
+													</span>
+												{/if}
+												{#if src.dependencies?.migrate_after?.length}
+													<span class="detail-group">
+														<strong>Migrate after:</strong>
+														{#each src.dependencies.migrate_after as dep, j}
+															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>{j < src.dependencies.migrate_after.length - 1 ? ', ' : ''}
+														{/each}
+													</span>
+												{/if}
+												{#if src.hints?.length}
+													<span class="detail-group">
+														<strong>Hints:</strong>
+														{src.hints.map((h) => `${h.type} (${h.from})`).join(', ')}
+													</span>
+												{/if}
 
-										<table
-											class="p-table--mobile-card"
-											aria-label="Details for {src.source_package}"
-										>
-											<tbody>
-												<tr>
-													<th>Verdict</th>
-													<td><VerdictBadge verdict={src.verdict} /></td>
-												</tr>
-												<tr>
-													<th>Age</th>
-													<td>{a.value} {a.unit}</td>
-												</tr>
-											</tbody>
-										</table>
-
-										{#if src.dependencies}
-											{#if src.dependencies.blocked_by && src.dependencies.blocked_by.length > 0}
-												<p><strong>Blocked by:</strong></p>
-												<ul class="p-list--divided">
-													{#each src.dependencies.blocked_by as dep}
-														<li class="p-list__item">
-															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>
-														</li>
-													{/each}
-												</ul>
-											{/if}
-											{#if src.dependencies.blocks && src.dependencies.blocks.length > 0}
-												<p><strong>Blocks:</strong></p>
-												<ul class="p-list--divided">
-													{#each src.dependencies.blocks as dep}
-														<li class="p-list__item">
-															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>
-														</li>
-													{/each}
-												</ul>
-											{/if}
-											{#if src.dependencies.migrate_after && src.dependencies.migrate_after.length > 0}
-												<p><strong>Migrate after:</strong></p>
-												<ul class="p-list--divided">
-													{#each src.dependencies.migrate_after as dep}
-														<li class="p-list__item">
-															<a href="/sources/{encodeURIComponent(dep)}">{dep}</a>
-														</li>
-													{/each}
-												</ul>
-											{/if}
-										{/if}
-
-										{#if src.hints && src.hints.length > 0}
-											<p><strong>Hints:</strong></p>
-											<ul class="p-list--divided">
-												{#each src.hints as hint}
-													<li class="p-list__item">{hint.type} (from {hint.from})</li>
-												{/each}
-											</ul>
-										{/if}
-
-										<p>
-											<a href="/sources/{encodeURIComponent(src.source_package)}?from=blocked">
-												View full details →
-											</a>
-										</p>
-									</section>
+												<a class="detail-link" href="/sources/{encodeURIComponent(src.source_package)}?from=blocked">
+													View full details →
+												</a>
+											</div>
+										</td>
+									</tr>
 								{/if}
-							</li>
-						{/each}
-					</ul>
-				</aside>
+							{/each}
+						</tbody>
+					</table>
+				</div>
 
 				<!-- Pagination -->
 				{#if blocked.total > blocked.limit}
@@ -322,65 +325,94 @@
 		white-space: nowrap;
 	}
 
-	/* ── Accordion overrides ───────────────────────────────────── */
+	.toolbar__expand {
+		flex-shrink: 0;
 
-	/* Vanilla assumes p-accordion__tab is a <button> (display: inline-flex).
-	   Since we use a <div> for accessibility reasons, we must set flex explicitly. */
-	.p-accordion__tab {
-		display: flex;
-		align-items: center;
+		button {
+			margin-bottom: 0;
+		}
 	}
 
-	.p-accordion__title {
-		flex: 1;
-		min-width: 0;
+	/* ── Table ─────────────────────────────────────────────────── */
+	.table-scroll-wrapper {
+		overflow-x: auto;
 	}
 
-	.accordion-header {
-		display: grid;
-		grid-template-columns: 3fr 2fr;
-		align-items: center;
+	.blocked-table {
 		width: 100%;
-		gap: 1rem;
+
+		.col-expand {
+			width: 2rem;
+			padding-right: 0;
+		}
+
+		.col-num {
+			width: 7rem;
+		}
+
+		.col-versions {
+			font-size: 0.875rem;
+			white-space: nowrap;
+		}
+
+		.col-verdict {
+			white-space: nowrap;
+		}
 	}
 
-	.accordion-col-left {
-		display: flex;
-		align-items: baseline;
-		gap: 0.5rem;
-		min-width: 0;
-		overflow: hidden;
+	/* ── Summary rows ──────────────────────────────────────────── */
+	.summary-row {
+		cursor: pointer;
+		user-select: none;
+
+		&:hover {
+			background: #f5f5f5;
+		}
+
+		&.is-open {
+			background: #f5f5f5;
+		}
 	}
 
-	.version-range {
-		font-size: 0.875rem;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.accordion-col-right {
-		min-width: 0;
-		text-align: right;
-	}
-
-	.accordion-excuse {
-		font-size: 0.875rem;
+	.expand-chevron {
 		color: #666;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		display: block;
+		font-size: 0.75rem;
 	}
 
-	/* ── Expanded panel ────────────────────────────────────────── */
-	.excuse-note {
-		background: #f5f5f5;
-		border-left: 4px solid #d9d9d9;
-		border-radius: 0 2px 2px 0;
-		color: #3c3c3c;
+	/* ── Detail rows ───────────────────────────────────────────── */
+	.detail-row {
+		background: #fafafa;
+	}
+
+	.detail-cell {
+		padding: 0.5rem 1rem 0.5rem 2.5rem !important;
+		border-top: none !important;
+	}
+
+	.detail-inner {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 1.25rem;
 		font-size: 0.875rem;
-		margin-bottom: 1rem;
-		padding: 0.5rem 0.75rem;
+	}
+
+	.detail-group {
+		white-space: normal;
+	}
+
+	.detail-link {
+		margin-left: auto;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	/* ── Excuse callout ────────────────────────────────────────── */
+	.excuse-note {
+		display: block;
+		width: 100%;
+		color: #666;
+		font-style: italic;
+		margin-bottom: 0.125rem;
 	}
 </style>
