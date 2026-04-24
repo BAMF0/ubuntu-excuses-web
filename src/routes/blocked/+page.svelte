@@ -1,35 +1,14 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import VerdictBadge from '$lib/components/VerdictBadge.svelte';
 
 	let { data } = $props();
 	const blocked = $derived(data.blocked);
 	const allTeams = $derived(data.meta?.teams ?? []);
 
-	/* ── Team filter (multi-select, server-side via URL) ────────── */
+	/* ── Team filter (client-side live filtering) ───────────────── */
 	let selectedTeams = $state<Set<string>>(new Set<string>());
 	let dropdownOpen = $state(false);
-
-	// Keep selected teams in sync when the page data changes (e.g. pagination/sort nav).
-	$effect(() => {
-		selectedTeams = new Set(data.teams);
-	});
-
-	// On first mount: if the URL carries no teams, restore from localStorage.
-	$effect(() => {
-		if (data.teams.length === 0) {
-			try {
-				const saved = localStorage.getItem('blockedTeams');
-				if (saved) {
-					const restored: string[] = JSON.parse(saved);
-					if (restored.length > 0) {
-						location.href = buildUrl({ teams: new Set(restored) });
-					}
-				}
-			} catch {
-				// ignore malformed localStorage data
-			}
-		}
-	});
 
 	function toggleTeam(team: string) {
 		const next = new Set(selectedTeams);
@@ -37,13 +16,11 @@
 		else next.add(team);
 		selectedTeams = next;
 		saveTeams(next);
-		location.href = buildUrl({ teams: next });
 	}
 
 	function clearTeams() {
 		selectedTeams = new Set();
 		saveTeams(new Set());
-		location.href = buildUrl({ teams: new Set() });
 	}
 
 	function saveTeams(teams: Set<string>) {
@@ -56,63 +33,67 @@
 
 	let searchQuery = $state('');
 
-	/* ── Expand / collapse state ───────────────────────────────── */
-	let allExpanded = $state(false);
-	/* Rows individually toggled away from the global state. */
-	let overrides = $state(new Set<number>());
+	/* ── Expand / collapse state (URL-driven) ───────────────────── */
+	let allExpanded = $state(data.expandAll);
+	let overrides = $state(new Set<string>());
 
-	/* Read saved preference once after mount (localStorage is browser-only). */
-	$effect(() => {
-		const saved = localStorage.getItem('blockedExpandAll');
-		if (saved !== null) allExpanded = saved === 'true';
+	onMount(() => {
+		try {
+			const teamsSaved = localStorage.getItem('blockedTeams');
+			if (teamsSaved) selectedTeams = new Set(JSON.parse(teamsSaved));
+		} catch {
+			// ignore malformed data
+		}
 	});
 
-	function isOpen(i: number): boolean {
-		return allExpanded ? !overrides.has(i) : overrides.has(i);
+	function isOpen(pkg: string): boolean {
+		return allExpanded ? !overrides.has(pkg) : overrides.has(pkg);
 	}
 
-	function toggle(i: number) {
+	function toggle(pkg: string) {
 		const next = new Set(overrides);
-		if (next.has(i)) next.delete(i);
-		else next.add(i);
+		if (next.has(pkg)) next.delete(pkg);
+		else next.add(pkg);
 		overrides = next;
 	}
 
 	function setAllExpanded(val: boolean) {
 		allExpanded = val;
 		overrides = new Set();
-		localStorage.setItem('blockedExpandAll', String(val));
+		const u = new URL(location.href);
+		if (val) u.searchParams.set('expanded', '1');
+		else u.searchParams.delete('expanded');
+		history.replaceState({}, '', u.toString());
 	}
 
 	/* ── Derived / filtered list ───────────────────────────────── */
 	const displayedSources = $derived(
-		searchQuery.trim()
-			? blocked.sources.filter((s) =>
-					s.source_package.toLowerCase().includes(searchQuery.trim().toLowerCase())
-				)
-			: blocked.sources
+		blocked.sources.filter((s) => {
+			if (selectedTeams.size > 0 && !selectedTeams.has(s.team ?? '')) return false;
+			if (searchQuery.trim() && !s.source_package.toLowerCase().includes(searchQuery.trim().toLowerCase())) return false;
+			return true;
+		})
 	);
 
 	/* ── Helpers ────────────────────────────────────────────────── */
 	interface BuildUrlOpts {
-		teams?: Set<string>;
 		sort?: string;
 		order?: string;
 		offset?: string;
 		limit?: string;
 	}
 
-	function buildUrl({ teams = selectedTeams, sort, order, offset, limit }: BuildUrlOpts = {}) {
+	function buildUrl({ sort, order, offset, limit }: BuildUrlOpts = {}) {
 		const base: Record<string, string> = {
 			sort: sort ?? blocked.sort,
 			order: order ?? blocked.order,
 			limit: limit ?? String(blocked.limit),
 			offset: offset ?? '0',
 		};
+		if (allExpanded) base.expanded = '1';
 		const params = new URLSearchParams(
 			Object.fromEntries(Object.entries(base).filter(([, v]) => v !== ''))
 		);
-		for (const t of teams) params.append('team', t);
 		return `/blocked?${params}`;
 	}
 
@@ -275,16 +256,16 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each displayedSources as src, i}
-								{@const open = isOpen(i)}
+							{#each displayedSources as src}
+								{@const open = isOpen(src.source_package)}
 								<tr
 									class="summary-row"
 									class:is-open={open}
-									onclick={() => toggle(i)}
+									onclick={() => toggle(src.source_package)}
 									onkeydown={(e) => {
 										if (e.key === 'Enter' || e.key === ' ') {
 											e.preventDefault();
-											toggle(i);
+											toggle(src.source_package);
 										}
 									}}
 									role="button"
