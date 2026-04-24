@@ -117,7 +117,7 @@
 													</span>
 												{/if}
 											{:else}
-												<span class="u-text--muted">—</span>
+												<span class="no-results">No results</span>
 											{/if}
 										</td>
 									{/each}
@@ -173,6 +173,11 @@
 
 	.col-result {
 		min-width: 7rem;
+	}
+
+	.no-results {
+		color: #b58d00;
+		font-size: 0.8rem;
 	}
 
 	.result-links {

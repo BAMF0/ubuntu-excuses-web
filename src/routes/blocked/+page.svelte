@@ -286,7 +286,19 @@
 										<strong>{src.source_package}</strong>
 									</td>
 									<td class="col-versions u-text--muted">
-										{src.old_version} → {src.new_version}
+										<a
+											href="https://launchpad.net/ubuntu/+source/{encodeURIComponent(src.source_package)}/{encodeURIComponent(src.old_version)}"
+											target="_blank"
+											rel="noopener noreferrer"
+											onclick={(e) => e.stopPropagation()}
+										>{src.old_version}</a>
+										→
+										<a
+											href="https://launchpad.net/ubuntu/+source/{encodeURIComponent(src.source_package)}/{encodeURIComponent(src.new_version)}"
+											target="_blank"
+											rel="noopener noreferrer"
+											onclick={(e) => e.stopPropagation()}
+										>{src.new_version}</a>
 									</td>
 									<td class="col-num u-align--right">
 										{numFailures(src)}

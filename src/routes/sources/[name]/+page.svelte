@@ -52,7 +52,19 @@
 					</tr>
 					<tr>
 						<th>Version</th>
-						<td>{pkg.old_version} → {pkg.new_version}</td>
+						<td>
+							<a
+								href="https://launchpad.net/ubuntu/+source/{encodeURIComponent(pkg.source_package)}/{encodeURIComponent(pkg.old_version)}"
+								target="_blank"
+								rel="noopener noreferrer"
+							>{pkg.old_version}</a>
+							→
+							<a
+								href="https://launchpad.net/ubuntu/+source/{encodeURIComponent(pkg.source_package)}/{encodeURIComponent(pkg.new_version)}"
+								target="_blank"
+								rel="noopener noreferrer"
+							>{pkg.new_version}</a>
+						</td>
 					</tr>
 					<tr>
 						<th>Candidate</th>
