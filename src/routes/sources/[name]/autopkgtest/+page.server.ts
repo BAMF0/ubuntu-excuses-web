@@ -2,7 +2,8 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types.js';
 import { getAutopkgtest } from '$lib/server/api.js';
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, setHeaders }) => {
+	setHeaders({ 'cache-control': 'public, max-age=300, stale-while-revalidate=3600' });
 	try {
 		const autopkgtest = await getAutopkgtest(params.name);
 		return { name: params.name, autopkgtest, from: url.searchParams.get('from') };

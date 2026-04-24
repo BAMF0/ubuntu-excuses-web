@@ -2,7 +2,8 @@ import { redirect } from '@sveltejs/kit';
 import { getSources } from '$lib/server/api.js';
 import type { PageServerLoad } from './$types.js';
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ url, setHeaders }) => {
+	setHeaders({ 'cache-control': 'public, max-age=300, stale-while-revalidate=3600' });
 	const q = url.searchParams.get('q') ?? '';
 	const depends = url.searchParams.get('depends') ?? '';
 	const sort = url.searchParams.get('sort') ?? 'name';

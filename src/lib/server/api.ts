@@ -17,6 +17,10 @@ function getBaseUrl(): string {
 	return env.EXCUSES_API_URL ?? 'http://localhost:8080';
 }
 
+// In-flight request deduplication: if two callers request the same URL
+// concurrently, they share a single fetch instead of making two.
+const inFlight = new Map<string, Promise<unknown>>();
+
 async function apiFetch<T>(path: string, params?: Record<string, string | string[]>): Promise<T> {
 	const url = new URL(path, getBaseUrl());
 	if (params) {
@@ -29,20 +33,45 @@ async function apiFetch<T>(path: string, params?: Record<string, string | string
 		}
 	}
 
-	const res = await fetch(url, {
-		headers: { Accept: 'application/json' }
-	});
+	const key = url.toString();
 
-	if (!res.ok) {
-		const body = await res.text();
-		throw new Error(`API ${res.status}: ${body}`);
+	if (inFlight.has(key)) {
+		return inFlight.get(key) as Promise<T>;
 	}
 
-	return res.json() as Promise<T>;
+	const promise = (async () => {
+		const res = await fetch(url, {
+			headers: { Accept: 'application/json' }
+		});
+
+		if (!res.ok) {
+			const body = await res.text();
+			throw new Error(`API ${res.status}: ${body}`);
+		}
+
+		return res.json() as T;
+	})();
+
+	inFlight.set(key, promise);
+	promise.finally(() => inFlight.delete(key));
+
+	return promise;
 }
 
-export function getMeta(): Promise<Meta> {
-	return apiFetch<Meta>('/meta');
+// TTL cache for /meta — this endpoint changes at most once per excuses run
+// (typically every few hours), so caching it server-side avoids a round-trip
+// on every incoming request.
+const META_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let metaCached: Meta | null = null;
+let metaExpiresAt = 0;
+
+export async function getMeta(): Promise<Meta> {
+	if (metaCached && Date.now() < metaExpiresAt) {
+		return metaCached;
+	}
+	metaCached = await apiFetch<Meta>('/meta');
+	metaExpiresAt = Date.now() + META_TTL_MS;
+	return metaCached;
 }
 
 export interface SourcesParams {

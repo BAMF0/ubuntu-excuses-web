@@ -1,3 +1,31 @@
-// Vanilla Framework – full import for Canonical styling
+// Import all Vanilla Framework SCSS definitions (no CSS output on its own)
 @import 'vanilla-framework/scss/vanilla';
-@include vanilla;
+
+// Generate CSS only for the components this app actually uses.
+// This replaces `@include vanilla` and eliminates ~80% of unused CSS.
+
+// Base (reset, typography, grid definitions, forms, tables, etc.)
+@include vf-base;
+
+// Patterns
+@include vf-p-buttons;
+@include vf-p-forms;
+@include vf-p-grid;
+@include vf-p-headings;
+@include vf-p-icons; // required by buttons, search-box, pagination
+@include vf-p-links;
+@include vf-p-lists;
+@include vf-p-pagination;
+@include vf-p-search-box;
+@include vf-p-section;
+@include vf-p-status-label;
+@include vf-p-strip;
+@include vf-p-table-mobile-card;
+
+// Utilities
+@include vf-u-align; // u-align--right
+@include vf-u-margin-collapse; // u-no-margin--top
+@include vf-u-off-screen; // u-off-screen
+@include vf-u-padding-collapse; // u-no-padding--top/bottom
+@include vf-u-text-muted; // u-text--muted
+@include vf-u-vertical-spacing; // u-sv*
