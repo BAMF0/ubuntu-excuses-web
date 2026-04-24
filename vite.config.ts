@@ -11,6 +11,14 @@ const dirname =
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
 	plugins: [sveltekit()],
+	server: {
+		host: process.env.HOST ?? 'localhost',
+		port: process.env.PORT ? Number(process.env.PORT) : 5173
+	},
+	preview: {
+		host: process.env.HOST ?? 'localhost',
+		port: process.env.PORT ? Number(process.env.PORT) : 4173
+	},
 	css: {
 		preprocessorOptions: {
 			scss: {
