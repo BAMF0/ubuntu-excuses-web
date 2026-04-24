@@ -322,7 +322,13 @@
 												<div class="detail-meta">
 													{#if src.team}
 														<span class="detail-group">
-															<strong>Team:</strong> {src.team}
+															<strong>Team:</strong>
+															<a
+																href="https://launchpad.net/~{encodeURIComponent(src.team)}"
+																target="_blank"
+																rel="noopener noreferrer"
+																onclick={(e) => e.stopPropagation()}
+															>{src.team}</a>
 														</span>
 													{/if}
 													{#if src.dependencies?.blocked_by?.length}

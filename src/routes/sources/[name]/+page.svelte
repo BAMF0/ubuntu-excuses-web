@@ -50,6 +50,18 @@
 						<th>Maintainer</th>
 						<td>{pkg.maintainer}</td>
 					</tr>
+					{#if pkg.team}
+						<tr>
+							<th>Team</th>
+							<td>
+								<a
+									href="https://launchpad.net/~{encodeURIComponent(pkg.team)}"
+									target="_blank"
+									rel="noopener noreferrer"
+								>{pkg.team}</a>
+							</td>
+						</tr>
+					{/if}
 					<tr>
 						<th>Version</th>
 						<td>

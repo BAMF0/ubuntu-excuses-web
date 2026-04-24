@@ -54,6 +54,7 @@ export interface Source {
 	source_package: string;
 	component: string;
 	maintainer: string;
+	team?: string;
 	verdict: string;
 	migration_status: string;
 	old_version: string;
