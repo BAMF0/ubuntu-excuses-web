@@ -1,19 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-
 	let query = $state('');
-
-	function navigate() {
-		const trimmed = query.trim();
-		if (trimmed) {
-			goto(`/search?q=${encodeURIComponent(trimmed)}`);
-		}
-	}
-
-	function handleSubmit(e: SubmitEvent) {
-		e.preventDefault();
-		navigate();
-	}
 </script>
 
 <section class="p-strip--hero">
@@ -26,11 +12,18 @@
 			</p>
 
 			<div class="p-hero__search-row">
-				<form class="p-search-box p-hero__search-box" role="search" onsubmit={handleSubmit}>
+				<form
+					id="hero-search"
+					action="/search"
+					method="GET"
+					class="p-search-box p-hero__search-box"
+					role="search"
+				>
 					<label class="u-off-screen" for="search-input">Search packages</label>
 					<input
 						type="search"
 						id="search-input"
+						name="q"
 						class="p-search-box__input"
 						placeholder="Search source packages…"
 						bind:value={query}
@@ -43,7 +36,7 @@
 						<span class="u-off-screen">Search</span>
 					</button>
 				</form>
-				<button type="button" class="p-button--positive p-hero__search-btn" onclick={navigate}>
+				<button type="submit" form="hero-search" class="p-button--positive p-hero__search-btn">
 					Search
 				</button>
 			</div>

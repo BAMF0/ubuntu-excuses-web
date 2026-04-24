@@ -4,9 +4,10 @@
 
 	interface Props {
 		policyInfo: PolicyInfo;
+		horizontal?: boolean;
 	}
 
-	const { policyInfo }: Props = $props();
+	const { policyInfo, horizontal = false }: Props = $props();
 
 	interface PolicyRow {
 		name: string;
@@ -56,21 +57,66 @@
 	});
 </script>
 
-<table aria-label="Policy verdicts">
-	<thead>
-		<tr>
-			<th>Policy</th>
-			<th>Verdict</th>
-			<th>Detail</th>
-		</tr>
-	</thead>
-	<tbody>
+{#if horizontal}
+	<div class="policy-strip" role="list" aria-label="Policy verdicts">
 		{#each rows as row}
-			<tr>
-				<td>{row.name}</td>
-				<td><VerdictBadge verdict={row.verdict} /></td>
-				<td>{row.detail ?? ''}</td>
-			</tr>
+			<div class="policy-chip" role="listitem">
+				<span class="policy-chip__name">{row.name}</span>
+				<VerdictBadge verdict={row.verdict} />
+				{#if row.detail}
+					<span class="policy-chip__detail">{row.detail}</span>
+				{/if}
+			</div>
 		{/each}
-	</tbody>
-</table>
+	</div>
+{:else}
+	<table aria-label="Policy verdicts">
+		<thead>
+			<tr>
+				<th>Policy</th>
+				<th>Verdict</th>
+				<th>Detail</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each rows as row}
+				<tr>
+					<td>{row.name}</td>
+					<td><VerdictBadge verdict={row.verdict} /></td>
+					<td>{row.detail ?? ''}</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+{/if}
+
+<style lang="scss">
+	.policy-strip {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1.5rem;
+		align-items: flex-start;
+		padding: 0.75rem 0 0.25rem;
+		border-top: 1px solid #e5e5e5;
+	}
+
+	.policy-chip {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.2rem;
+	}
+
+	.policy-chip__name {
+		font-size: 0.7rem;
+		color: #666;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		font-weight: 500;
+	}
+
+	.policy-chip__detail {
+		font-size: 0.7rem;
+		color: #999;
+	}
+</style>

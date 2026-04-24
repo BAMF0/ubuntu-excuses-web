@@ -307,7 +307,12 @@
 										{ageDays(src.age)}
 									</td>
 									<td class="col-verdict">
-										<VerdictBadge verdict={src.verdict} />
+										<a
+											href="/sources/{encodeURIComponent(src.source_package)}?from=blocked"
+											onclick={(e) => e.stopPropagation()}
+										>
+											<VerdictBadge verdict={src.verdict} />
+										</a>
 									</td>
 								</tr>
 
