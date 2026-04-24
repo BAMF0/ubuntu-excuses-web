@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import VerdictBadge from '$lib/components/VerdictBadge.svelte';
 
 	let { data } = $props();
@@ -15,20 +14,10 @@
 		if (next.has(team)) next.delete(team);
 		else next.add(team);
 		selectedTeams = next;
-		saveTeams(next);
 	}
 
 	function clearTeams() {
 		selectedTeams = new Set();
-		saveTeams(new Set());
-	}
-
-	function saveTeams(teams: Set<string>) {
-		try {
-			localStorage.setItem('blockedTeams', JSON.stringify([...teams]));
-		} catch {
-			// ignore (e.g. private browsing with storage disabled)
-		}
 	}
 
 	let searchQuery = $state('');
@@ -36,15 +25,6 @@
 	/* ── Expand / collapse state (URL-driven) ───────────────────── */
 	let allExpanded = $state(data.expandAll);
 	let overrides = $state(new Set<string>());
-
-	onMount(() => {
-		try {
-			const teamsSaved = localStorage.getItem('blockedTeams');
-			if (teamsSaved) selectedTeams = new Set(JSON.parse(teamsSaved));
-		} catch {
-			// ignore malformed data
-		}
-	});
 
 	function isOpen(pkg: string): boolean {
 		return allExpanded ? !overrides.has(pkg) : overrides.has(pkg);
