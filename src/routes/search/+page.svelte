@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import VerdictBadge from '$lib/components/VerdictBadge.svelte';
 
 	let { data } = $props();
@@ -34,7 +33,7 @@
 		const params: Record<string, string> = {};
 		if (queryInput.trim()) params.q = queryInput.trim();
 		if (dependsInput.trim()) params.depends = dependsInput.trim();
-		goto(`/search?${new URLSearchParams(params)}`);
+		location.href = `/search?${new URLSearchParams(params)}`;
 	}
 
 	function handleSubmit(e: SubmitEvent) {
@@ -125,14 +124,14 @@
 							id="sort-select"
 							class="p-form__control sort-select"
 							value={sources.sort}
-							onchange={(e) => goto(buildUrl({ sort: e.currentTarget.value }))}
+							onchange={(e) => (location.href = buildUrl({ sort: e.currentTarget.value }))}
 						>
 							<option value="name">Name</option>
 							<option value="age">Age</option>
 						</select>
 						<button
 							class="p-button--base direction-btn"
-							onclick={() => goto(buildUrl({ order: sources.order === 'asc' ? 'desc' : 'asc' }))}
+							onclick={() => (location.href = buildUrl({ order: sources.order === 'asc' ? 'desc' : 'asc' }))}
 							title={sources.order === 'asc'
 								? 'Currently ascending – click to sort descending'
 								: 'Currently descending – click to sort ascending'}

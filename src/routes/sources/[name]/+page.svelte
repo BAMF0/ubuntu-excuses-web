@@ -233,7 +233,7 @@
 										{:else if item.category === 'bug'}
 											Bug hold —
 											<a
-												href="https://launchpad.net/bugs/{item.bugId}"
+												href="https://pad.lv/{item.bugId}"
 												target="_blank"
 												rel="noopener noreferrer"
 											>bug #{item.bugId}</a>

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import VerdictBadge from '$lib/components/VerdictBadge.svelte';
 
 	let { data } = $props();
@@ -23,7 +22,7 @@
 				if (saved) {
 					const restored: string[] = JSON.parse(saved);
 					if (restored.length > 0) {
-						goto(buildUrl({ teams: new Set(restored) }));
+						location.href = buildUrl({ teams: new Set(restored) });
 					}
 				}
 			} catch {
@@ -38,13 +37,13 @@
 		else next.add(team);
 		selectedTeams = next;
 		saveTeams(next);
-		goto(buildUrl({ teams: next }));
+		location.href = buildUrl({ teams: next });
 	}
 
 	function clearTeams() {
 		selectedTeams = new Set();
 		saveTeams(new Set());
-		goto(buildUrl({ teams: new Set() }));
+		location.href = buildUrl({ teams: new Set() });
 	}
 
 	function saveTeams(teams: Set<string>) {
@@ -207,20 +206,34 @@
 						id="sort-select"
 						class="p-form__control toolbar__sort-select"
 						value={blocked.sort}
-						onchange={(e) => goto(buildUrl({ sort: e.currentTarget.value }))}
+						onchange={(e) => (location.href = buildUrl({ sort: e.currentTarget.value }))}
 					>
 						<option value="age">Age</option>
 						<option value="name">Name</option>
 					</select>
 					<button
 						class="p-button--base toolbar__direction-btn"
-						onclick={() => goto(buildUrl({ order: blocked.order === 'asc' ? 'desc' : 'asc' }))}
+						onclick={() => (location.href = buildUrl({ order: blocked.order === 'asc' ? 'desc' : 'asc' }))}
 						title={blocked.order === 'asc'
 							? 'Currently ascending – click to sort descending'
 							: 'Currently descending – click to sort ascending'}
 					>
 						{blocked.order === 'asc' ? '↑ Ascending' : '↓ Descending'}
 					</button>
+				</div>
+
+				<div class="toolbar__limit">
+					<label class="toolbar__sort-label" for="limit-select">Per page</label>
+					<select
+						id="limit-select"
+						class="p-form__control toolbar__sort-select"
+						value={String(blocked.limit)}
+						onchange={(e) => (location.href = buildUrl({ limit: e.currentTarget.value }))}
+					>
+						<option value="10">10</option>
+						<option value="50">50</option>
+						<option value="100">100</option>
+					</select>
 				</div>
 
 				<div class="toolbar__expand">
@@ -536,6 +549,13 @@
 	.toolbar__direction-btn {
 		margin-bottom: 0;
 		white-space: nowrap;
+	}
+
+	.toolbar__limit {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
 	}
 
 	.toolbar__expand {
