@@ -279,7 +279,7 @@
 														View full details →
 													</a>
 													{#if src.has_autopkgtest}
-														<a href="/sources/{encodeURIComponent(src.source_package)}/autopkgtest">
+														<a href="/sources/{encodeURIComponent(src.source_package)}/autopkgtest?from=blocked">
 															Autopkgtests →
 														</a>
 													{/if}
