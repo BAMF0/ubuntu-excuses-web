@@ -6,13 +6,34 @@
 	}
 
 	const { meta }: Props = $props();
-	const formattedDate = $derived(
-		new Date(meta.generated_date).toLocaleString('en-GB', {
-			dateStyle: 'medium',
-			timeStyle: 'short',
-			timeZone: 'UTC'
-		})
-	);
+	const utcFormatted = new Date(meta.generated_date).toLocaleString('en-GB', {
+		dateStyle: 'medium',
+		timeStyle: 'short',
+		timeZone: 'UTC'
+	}) + ' UTC';
+
+	let showUTC = $state(false);
+	let formattedDate = $state(utcFormatted);
+
+	$effect(() => {
+		const saved = localStorage.getItem('statusBarShowUTC');
+		if (saved !== null) showUTC = saved === 'true';
+	});
+
+	$effect(() => {
+		formattedDate = showUTC
+			? utcFormatted
+			: new Date(meta.generated_date).toLocaleString(undefined, {
+					dateStyle: 'medium',
+					timeStyle: 'short',
+					timeZoneName: 'short'
+				});
+	});
+
+	function toggleTimezone() {
+		showUTC = !showUTC;
+		localStorage.setItem('statusBarShowUTC', String(showUTC));
+	}
 
 	const statusEntries = $derived(
 		Object.entries(meta.migration_status_counts ?? {}).sort(([a], [b]) => a.localeCompare(b))
@@ -40,7 +61,9 @@
 			<span class="p-status-bar__separator" aria-hidden="true"></span>
 			<span class="p-status-bar__item">
 				<strong>Generated:</strong>
-				{formattedDate} UTC
+				<button class="status-bar__date-toggle" onclick={toggleTimezone} title="Click to toggle UTC / local time">
+					{formattedDate}
+				</button>
 			</span>
 			<span class="p-status-bar__item">
 				<strong>Sources:</strong>
@@ -61,6 +84,24 @@
 </div>
 
 <style lang="scss">
+	.status-bar__date-toggle {
+		background: none;
+		border: none;
+		padding: 0;
+		margin: 0;
+		color: inherit;
+		font: inherit;
+		line-height: inherit;
+		vertical-align: baseline;
+		cursor: pointer;
+		text-decoration: underline dotted;
+		text-underline-offset: 2px;
+
+		&:hover {
+			color: #fff;
+		}
+	}
+
 	.p-status-bar {
 		background-color: #262626;
 		color: #f7f7f7;

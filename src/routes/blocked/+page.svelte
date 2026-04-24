@@ -4,22 +4,55 @@
 
 	let { data } = $props();
 	const blocked = $derived(data.blocked);
-	const teams = $derived(data.meta?.teams ?? []);
+	const allTeams = $derived(data.meta?.teams ?? []);
 
-	/* ── Team filter (server-side via URL) ─────────────────────── */
-	let teamInput = $state('');
+	/* ── Team filter (multi-select, server-side via URL) ────────── */
+	let selectedTeams = $state<Set<string>>(new Set<string>());
+	let dropdownOpen = $state(false);
 
+	// Keep selected teams in sync when the page data changes (e.g. pagination/sort nav).
 	$effect(() => {
-		teamInput = data.team ?? '';
+		selectedTeams = new Set(data.teams);
 	});
 
-	function applyTeamFilter() {
-		goto(buildUrl({ team: teamInput.trim(), offset: '0' }));
+	// On first mount: if the URL carries no teams, restore from localStorage.
+	$effect(() => {
+		if (data.teams.length === 0) {
+			try {
+				const saved = localStorage.getItem('blockedTeams');
+				if (saved) {
+					const restored: string[] = JSON.parse(saved);
+					if (restored.length > 0) {
+						goto(buildUrl({ teams: new Set(restored) }));
+					}
+				}
+			} catch {
+				// ignore malformed localStorage data
+			}
+		}
+	});
+
+	function toggleTeam(team: string) {
+		const next = new Set(selectedTeams);
+		if (next.has(team)) next.delete(team);
+		else next.add(team);
+		selectedTeams = next;
+		saveTeams(next);
+		goto(buildUrl({ teams: next }));
 	}
 
-	function clearTeamFilter() {
-		teamInput = '';
-		goto(buildUrl({ team: '', offset: '0' }));
+	function clearTeams() {
+		selectedTeams = new Set();
+		saveTeams(new Set());
+		goto(buildUrl({ teams: new Set() }));
+	}
+
+	function saveTeams(teams: Set<string>) {
+		try {
+			localStorage.setItem('blockedTeams', JSON.stringify([...teams]));
+		} catch {
+			// ignore (e.g. private browsing with storage disabled)
+		}
 	}
 
 	let searchQuery = $state('');
@@ -62,17 +95,26 @@
 	);
 
 	/* ── Helpers ────────────────────────────────────────────────── */
-	function buildUrl(overrides: Record<string, string>) {
+	interface BuildUrlOpts {
+		teams?: Set<string>;
+		sort?: string;
+		order?: string;
+		offset?: string;
+		limit?: string;
+	}
+
+	function buildUrl({ teams = selectedTeams, sort, order, offset, limit }: BuildUrlOpts = {}) {
 		const base: Record<string, string> = {
-			sort: blocked.sort,
-			order: blocked.order,
-			limit: String(blocked.limit),
-			offset: '0',
+			sort: sort ?? blocked.sort,
+			order: order ?? blocked.order,
+			limit: limit ?? String(blocked.limit),
+			offset: offset ?? '0',
 		};
-		if (data.team) base.team = data.team;
-		const merged = { ...base, ...overrides };
-		const filtered = Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== ''));
-		return `/blocked?${new URLSearchParams(filtered)}`;
+		const params = new URLSearchParams(
+			Object.fromEntries(Object.entries(base).filter(([, v]) => v !== ''))
+		);
+		for (const t of teams) params.append('team', t);
+		return `/blocked?${params}`;
 	}
 
 	function numFailures(src: (typeof blocked.sources)[number]): number {
@@ -83,7 +125,16 @@
 		if (age < 1) return '<1';
 		return Math.round(age).toString();
 	}
+
+	/* Close dropdown when clicking outside */
+	function onWindowClick(e: MouseEvent) {
+		if (dropdownOpen && !(e.target as Element).closest('.toolbar__team')) {
+			dropdownOpen = false;
+		}
+	}
 </script>
+
+<svelte:window onclick={onWindowClick} />
 
 <svelte:head>
 	<title>Blocked Packages – Ubuntu Excuses Explorer</title>
@@ -110,23 +161,43 @@
 				</div>
 
 				<div class="toolbar__team">
-					<label class="u-off-screen" for="team-input">Filter by team</label>
-					<input
-						list="team-list"
-						id="team-input"
-						class="p-form__control toolbar__team-input"
-						placeholder="Filter by team…"
-						bind:value={teamInput}
-						onchange={applyTeamFilter}
-						onkeydown={(e) => e.key === 'Enter' && applyTeamFilter()}
-					/>
-					<datalist id="team-list">
-						{#each teams as t}
-							<option value={t}></option>
-						{/each}
-					</datalist>
-					{#if data.team}
-						<button class="p-button--base toolbar__team-clear" onclick={clearTeamFilter} title="Clear team filter">✕</button>
+					<button
+						class="p-button--base toolbar__team-btn"
+						class:is-active={selectedTeams.size > 0}
+						onclick={(e) => { e.stopPropagation(); dropdownOpen = !dropdownOpen; }}
+						aria-haspopup="listbox"
+						aria-expanded={dropdownOpen}
+					>
+						{#if selectedTeams.size === 0}
+							All teams ▾
+						{:else if selectedTeams.size === 1}
+							{[...selectedTeams][0]} ▾
+						{:else}
+							{selectedTeams.size} teams ▾
+						{/if}
+					</button>
+					<button
+						class="p-button--base toolbar__team-clear"
+						style:visibility={selectedTeams.size > 0 ? 'visible' : 'hidden'}
+						onclick={clearTeams}
+						title="Clear team filter"
+						tabindex={selectedTeams.size === 0 ? -1 : 0}
+					>✕</button>
+
+					{#if dropdownOpen}
+						<div class="team-dropdown" role="listbox" aria-multiselectable="true">
+							{#each allTeams as team}
+								{@const checked = selectedTeams.has(team)}
+								<label class="team-option" class:is-checked={checked}>
+									<input
+										type="checkbox"
+										{checked}
+										onchange={() => toggleTeam(team)}
+									/>
+									{team}
+								</label>
+							{/each}
+						</div>
 					{/if}
 				</div>
 
@@ -358,22 +429,68 @@
 	}
 
 	.toolbar__team {
-		flex: 1;
-		min-width: 10rem;
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
+		flex-shrink: 0;
 	}
 
-	.toolbar__team-input {
-		flex: 1;
+	.toolbar__team-btn {
 		margin-bottom: 0;
+		white-space: nowrap;
+		width: 12rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		text-align: left;
+
+		&.is-active {
+			font-weight: bold;
+		}
 	}
 
 	.toolbar__team-clear {
 		margin-bottom: 0;
 		padding: 0 0.5rem;
 		flex-shrink: 0;
+	}
+
+	.team-dropdown {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		z-index: 100;
+		background: #fff;
+		border: 1px solid #cdcdcd;
+		border-radius: 2px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+		min-width: 14rem;
+		max-height: 20rem;
+		overflow-y: auto;
+		padding: 0.25rem 0;
+	}
+
+	.team-option {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.35rem 0.75rem;
+		cursor: pointer;
+		user-select: none;
+		font-size: 0.875rem;
+
+		&:hover {
+			background: #f5f5f5;
+		}
+
+		&.is-checked {
+			font-weight: bold;
+		}
+
+		input[type='checkbox'] {
+			margin: 0;
+			cursor: pointer;
+		}
 	}
 
 	.toolbar__sort {

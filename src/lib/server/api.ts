@@ -17,11 +17,15 @@ function getBaseUrl(): string {
 	return env.EXCUSES_API_URL ?? 'http://localhost:8080';
 }
 
-async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
+async function apiFetch<T>(path: string, params?: Record<string, string | string[]>): Promise<T> {
 	const url = new URL(path, getBaseUrl());
 	if (params) {
 		for (const [k, v] of Object.entries(params)) {
-			if (v !== undefined && v !== '') url.searchParams.set(k, v);
+			if (Array.isArray(v)) {
+				for (const item of v) url.searchParams.append(k, item);
+			} else if (v !== undefined && v !== '') {
+				url.searchParams.set(k, v);
+			}
 		}
 	}
 
@@ -77,15 +81,17 @@ export interface BlockedParams {
 	limit?: number;
 	sort?: string;
 	order?: string;
-	team?: string;
+	teams?: string[];
 }
 
 export function getBlocked(params?: BlockedParams): Promise<BlockedResponse> {
-	const query: Record<string, string> = {};
+	const query: Record<string, string | string[]> = {};
 	if (params) {
-		for (const [k, v] of Object.entries(params)) {
-			if (v !== undefined && v !== null) query[k] = String(v);
-		}
+		if (params.offset !== undefined) query.offset = String(params.offset);
+		if (params.limit !== undefined) query.limit = String(params.limit);
+		if (params.sort) query.sort = params.sort;
+		if (params.order) query.order = params.order;
+		if (params.teams?.length) query.team = params.teams;
 	}
 	return apiFetch<BlockedResponse>('/blocked', query);
 }
